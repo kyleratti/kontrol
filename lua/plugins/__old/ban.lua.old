@@ -1,0 +1,173 @@
+local tPlugin = {}
+tPlugin.Name = "Ban"
+tPlugin.Author = "Banana Lord"
+tPlugin.Type = PLUGIN_PUNISH
+tPlugin.API = 1
+tPlugin.Icon = "icon16/exclamation.png"
+function tPlugin:CanUse(objPl)
+	return objPl:IsMod()
+end
+
+if(SERVER) then
+	kontrol:AddLogType("Kick_Ban")
+
+	kontrol:AddCommand("ban", function(objPl, strCmd, tblArgs)
+		if(not IsValid(objPl)) then return end
+		if(not tPlugin:CanUse(objPl)) then
+			objPl:PrintMessage(HUD_PRINTCONSOLE, "Unknown cmd: "..strCmd)
+			return
+		end
+
+		if(not tblArgs) then return end
+
+		local objTarget = player.GetByUniqueID(tblArgs[1])
+		if(not kontrol:ValidCommand(objPl, objTarget, true)) then return end
+
+		local iTime = tonumber(tblArgs[2] or 5)
+		table.remove(tblArgs, 1)
+		table.remove(tblArgs, 1)
+		local strReason = "No reason specified"
+		if(tblArgs) then
+			strReason = table.concat(tblArgs, " ")
+		end
+
+		kontrol:Log({
+			["Type"] = KONTROL_LOG_KICK_BAN,
+			["Message"] = {
+				{["Log"] = kontrol:Nick(objPl), ["Chat"] = kontrol:Nick(objPl, false, true, true)},
+				{["Log"] = " banned "},
+				{["Log"] = kontrol:Nick(objTarget), ["Chat"] = kontrol:Nick(objTarget, false, true)},
+				{["Log"] = " for "},
+				{["Log"] = time.Simple(iTime * 60), ["Chat"] = {colorx["Pink"], time.Simple(iTime * 60)}},
+				{["Log"] = " ("..strReason..")", ["Chat"] = {" (", colorx["Lime"], strReason, color_white, ")"}},
+			},
+		})
+
+		frank.AddBan(objTarget:Nick(), objTarget:SteamID(), iTime, strReason, objPl:Nick(), objPl:SteamID())
+	end)
+
+	kontrol:AddCommand("banid", function(objPl, strCmd, tblArgs)
+		if(not IsValid(objPl)) then return end
+		if(not tPlugin:CanUse(objPl)) then
+			objPl:PrintMessage(HUD_PRINTCONSOLE, "Unknown cmd: "..strCmd)
+			return
+		end
+
+		if(not tblArgs[1]) then return end
+
+		local strSteamID = string.upper(tblArgs[1])
+		if(not string.steamid(strSteamID)) then
+			objPl:PrintMessage(HUD_PRINTTALK, "Invalid SteamID!")
+			return
+		end
+
+		local iTime = tonumber(tblArgs[2] or 5)
+		table.remove(tblArgs, 1)
+		table.remove(tblArgs, 1)
+		local strReason = "No reason specified"
+		if(tblArgs) then
+			strReason = table.concat(tblArgs, " ")
+		end
+
+		kontrol:Log({
+			["Type"] = KONTROL_LOG_KICK_BAN,
+			["Message"] = {
+				{["Log"] = kontrol:Nick(objPl), ["Chat"] = kontrol:Nick(objPl, false, true, true)},
+				{["Log"] = " banned "},
+				{["Log"] = strSteamID, ["Chat"] = {colorx["Pink"], strSteamID}},
+				{["Log"] = " for "},
+				{["Log"] = time.Simple(iTime * 60), ["Chat"] = {colorx["CoolBlue"], time.Simple(iTime * 60)}},
+				{["Log"] = " ("..strReason..")", ["Chat"] = {" (", colorx["Lime"], strReason, color_white, ")"}},
+			},
+		})
+
+		frank.AddBan("(banned via SteamID)", strSteamID, iTime, strReason, objPl:Nick(), objPl:SteamID())
+	end)
+
+	kontrol:AddCommand("unban", function(objPl, strCmd, tblArgs)
+		if(not IsValid(objPl)) then return end
+		if(not tPlugin:CanUse(objPl)) then
+			objPl:PrintMessage(HUD_PRINTCONSOLE, "Unknown cmd: "..strCmd)
+			return
+		end
+
+		if(not tblArgs) then return end
+
+		local strSteamID = string.upper(tblArgs[1])
+		if(not string.steamid(strSteamID)) then
+			objPl:PrintMessage(HUD_PRINTTALK, "Invalid SteamID!")
+			return
+		end
+		
+		kontrol:Log({
+			["Type"] = KONTROL_LOG_KICK_BAN,
+			["Message"] = {
+				{["Log"] = kontrol:Nick(objPl), ["Chat"] = kontrol:Nick(objPl, false, true, true)},
+				{["Log"] = " un-banned "},
+				{["Log"] = strSteamID, ["Chat"] = {colorx["Pink"], strSteamID}},
+			},
+		})
+
+		frank.RemoveBan(strSteamID)
+	end)
+else
+	function tPlugin.Menu(iUID)
+		local target = player.GetByUniqueID(iUID)
+
+		local pMenu = vgui.Create("KFrame2")
+		pMenu:SetSize(300, 112)
+		pMenu:SetPos(ScrW() / 2 - 150, ScrH() / 2 - 56)
+		pMenu:SetTitle("Ban "..target:Nick())
+		pMenu:SetDraggable(true)
+		pMenu:ShowCloseButton(true)
+		pMenu:SetSizable(false)
+		pMenu:SetScreenLock(true)
+		pMenu:MakePopup()
+
+		local pReason = vgui.Create("DTextEntry", pMenu)
+		pReason:SetSize(250, 20)
+		pReason:SetPos(10, 32)
+		pReason:SetValue("Consider this a warning...")
+
+		local bReasons = vgui.Create("KButton", pMenu)
+		bReasons:SetSize(25, 20)
+		bReasons:SetPos(15 + pReason:GetWide(), 32.5)
+		bReasons:SetText(">")
+		function bReasons:DoClick()
+			local pSR = DermaMenu()
+			for k,v in pairs(kontrol.ban_reasons) do
+				pSR:AddOption(v, function()
+					pReason:SetValue(v)
+				end)
+			end
+			pSR:Open()
+		end
+
+		local sChoice = time.Simple(5 * 60)
+		local pLength = vgui.Create("DComboBox", pMenu)
+		pLength:SetPos(10, 57)
+		pLength:SetSize(280, 20)
+		pLength:SetText(sChoice)
+		function pLength:OnSelect(pPanel, sValue)
+			sChoice = sValue
+		end
+
+		for k,v in pairs(kontrol.ban_times) do
+			pLength:AddChoice(v.Word)
+		end
+		pLength:AddChoice("Permanent")
+
+		local pAccept = vgui.Create("KButton", pMenu)
+		pAccept:SetSize(pMenu:GetWide() - 20, 20)
+		pAccept:SetPos(10, pMenu:GetTall() - pAccept:GetTall() - 10)
+		pAccept:SetText("Ban "..target:Nick())
+		function pAccept:DoClick()
+			local sReason = pReason:GetValue()
+			kontrol:AddBanReason(sReason)
+			RunConsoleCommand("kontrol_ban", iUID, kontrol.ban_times_convert[sChoice] or "5", sReason)
+			pMenu:Close()
+		end
+	end
+end
+
+kontrol:RegisterPlugin(tPlugin)
